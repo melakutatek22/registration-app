@@ -1,0 +1,61 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: registrationdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=registrationdb"
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      working-directory: backend
+      run: dotnet restore
+
+    - name: Build
+      working-directory: backend
+      run: dotnet build --configuration Release
+
+    - name: Publish
+      working-directory: backend
+      run: dotnet publish -c Release -o out
+
+
+    - name: Docker Login
+      run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+    - name: Build and Push Backend Docker Image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/registration-backend ./backend
+        docker push ${{ secrets.DOCKER_USERNAME }}/registration-backend
+
+    - name: Build and Push Frontend Docker Image
+      run: |
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/registration-frontend ./frontend
+        docker push ${{ secrets.DOCKER_USERNAME }}/registration-frontend
