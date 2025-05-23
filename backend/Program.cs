@@ -1,4 +1,12 @@
+using backend.Data;
+using backend.Models;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Add DbContext with PostgreSQL connection string
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -11,12 +19,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapPost("/register", (User user) =>
+// POST /register endpoint to add user to database
+app.MapPost("/register", async (User user, AppDbContext db) =>
 {
-    // Simulate user registration logic
+    db.Users.Add(user);
+    await db.SaveChangesAsync();
     return Results.Ok(new { Message = "User registered successfully", User = user });
 });
 
 app.Run();
-
-record User(string Username, string Email, string Password);
